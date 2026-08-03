@@ -1,0 +1,62 @@
+# Iron Ledger — Complete Technical Specification & LLM Reference
+
+> **Tagline:** Every set. Every rep. Accounted for.
+> **Repository:** iron-ledger
+> **License:** MIT
+
+---
+
+## Architecture & System Design
+
+Iron Ledger follows Clean Architecture and SOLID principles. The codebase is organized into five isolated layers:
+
+1. **Configuration & Core Infrastructure (`iron_ledger/config.py`, `iron_ledger/constants.py`, `iron_ledger/exceptions.py`)**
+   - Config loading from environment variables (`HEVY_API_KEY`).
+   - Unified exception hierarchy rooted at `IronLedgerError`.
+
+2. **HTTP API Layer (`iron_ledger/api/`)**
+   - `HevyClient`: Wraps `requests.Session` with `api-key` header authentication, automatic pagination generators, and exponential backoff retry on HTTP 429 status codes.
+   - `RoutineService`: CRUD operations on `/v1/routines`.
+   - `FolderService`: CRUD operations on `/v1/routine_folders`.
+   - `ExerciseService`: Fetches template catalog from `/v1/exercise_templates`.
+
+3. **Domain Layer (`iron_ledger/domain/`)**
+   - `models.py`: Strongly typed, immutable `@dataclass` models (`ExerciseSet`, `RoutineExercise`, `Routine`, `RoutineFolder`, `ExerciseTemplate`).
+   - `mapper.py`: `ExerciseMatcher` implementing a 3-pass algorithm:
+     - Pass 1: Case-insensitive exact match on full template title.
+     - Pass 2: SequenceMatcher fuzzy match on full template title (preserving equipment details in parentheses).
+     - Pass 3: SequenceMatcher fuzzy match on normalized title (parentheses stripped).
+
+4. **Importer Orchestration (`iron_ledger/importer/`)**
+   - `validator.py`: `validate_program()` performs early fail-fast validation of workout definitions (checking non-empty titles, exercises, valid set types: `warmup`, `normal`, `failure`, `dropset`, non-negative weights/reps, and valid RPEs).
+   - `importer.py`: `ProgramImporter` coordinates the full pipeline: Validation → Folder creation → Exercise matching → Routine API payload serialization → HTTP creation.
+
+5. **CLI Entrypoint (`cli.py`)**
+   - Command-line interface built with `argparse`.
+   - Supports `--dry-run` mode (validates without invoking network requests or requiring API keys).
+   - Supports custom folder target via `--folder`.
+
+---
+
+## Conventions for Git Commits
+
+Commits must strictly use **Conventional Commits + Gitmoji**:
+
+- `feat(scope): ✨ description`
+- `fix(scope): 🐛 description`
+- `docs(scope): 📝 description`
+- `style(scope): 💄 description`
+- `refactor(scope): ♻️ description`
+- `test(scope): ✅ description`
+- `chore(scope): 🔧 description`
+- `init(repo): 🎉 description`
+
+---
+
+## Automated Tests
+
+Run with pytest:
+```bash
+python -m pytest tests/ -v
+```
+Includes test suites for `validate_program` edge cases and `ExerciseMatcher` fuzzy matching passes.

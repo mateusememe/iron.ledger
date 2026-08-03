@@ -1,0 +1,25 @@
+# Iron Ledger
+
+> Every set. Every rep. Accounted for.
+
+Iron Ledger is a clean, modular Python SDK and CLI for importing, validating, and managing workout routines in the Hevy app via the official Hevy API v1.
+
+## Key Files
+- [AGENTS.md](AGENTS.md): Full LLM guidelines, architecture map, and Gitmoji / Conventional Commits rules.
+- [README.md](README.md): Project overview and user documentation.
+- [cli.py](cli.py): CLI entrypoint for routine uploading (`upload`, `--dry-run`, `--folder`).
+- [iron_ledger/config.py](iron_ledger/config.py): Environment configuration loader.
+- [iron_ledger/api/client.py](iron_ledger/api/client.py): Hevy API HTTP client with auto-pagination and 429 retry backoff.
+- [iron_ledger/domain/mapper.py](iron_ledger/domain/mapper.py): 3-pass fuzzy exercise matcher against Hevy template library.
+- [iron_ledger/importer/importer.py](iron_ledger/importer/importer.py): Core import orchestrator (validate → folder → map → routine).
+- [iron_ledger/importer/validator.py](iron_ledger/importer/validator.py): Program definition validator.
+- [iron_ledger/workouts/periodizacao_ab_ab_fullbody.py](iron_ledger/workouts/periodizacao_ab_ab_fullbody.py): 5-day AB-AB-FullBody workout program definition.
+- [tests/](tests/): Pytest suite for validator and fuzzy mapper.
+
+## Usage
+```bash
+pip install -r requirements.txt
+python cli.py upload --dry-run
+python cli.py upload iron_ledger/workouts/periodizacao_ab_ab_fullbody.py --folder "Periodização AB-AB-FullBody (5 Dias)"
+python -m pytest tests/ -v
+```
