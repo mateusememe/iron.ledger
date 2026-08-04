@@ -4,12 +4,10 @@ import re
 import json
 import traceback
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-# Import the custom WebLLM component wrapper
-from components.webllm import webllm_generate
 
 # Import Iron Ledger core
 from iron_ledger.api.client import HevyClient
@@ -73,7 +71,6 @@ def smart_parse_workout(text: str) -> dict:
             
         # Extract Exercise Name
         ex_name = None
-        # Pattern 1: 1. Bench Press (Barbell) - 4 sets of 8
         ex_match = re.search(r'^(?:\d+[\.\)]\s*)?([A-Za-zÀ-ÿ\s\(\)\-\/\:\,\'\"]+?)(?:[\:\-]\s*|\s+\d+\s*(?:x|sets|séries|\*))', line_str, re.IGNORECASE)
         if ex_match:
             candidate = ex_match.group(1).strip(" :-")
@@ -106,8 +103,6 @@ if "hevy_api_key" not in st.session_state:
     st.session_state.hevy_api_key = ""
 if "llm_result" not in st.session_state:
     st.session_state.llm_result = None
-if "parser_mode" not in st.session_state:
-    st.session_state.parser_mode = "⚡ Smart Parser (Instant)"
 
 # API Key Header
 api_key = st.text_input(
@@ -135,43 +130,105 @@ TREINO B:
 2. Overhead Press (Barbell) - 4 sets of 8 reps (40kg)
 3. Lat Pulldown (Cable) - 3 sets of 15 reps (45kg)"""
 
-workout_text = st.text_area("Treino em Linguagem Natural", value=default_prompt, height=220)
+workout_text = st.text_area("Treino em Linguagem Natural", value=default_prompt, height=200)
 
-col_mode, col_btn = st.columns([2, 1])
+col1, col2 = st.columns([1, 1])
 
-with col_mode:
-    mode = st.radio(
-        "Modo de Conversão:",
-        ["⚡ Smart Parser (Instantâneo)", "🤖 WebLLM AI (Local Browser WebGPU)"],
-        horizontal=True
-    )
-    st.session_state.parser_mode = mode
-
-with col_btn:
-    st.write("") # Alignment spacing
-    st.write("")
-    generate_clicked = st.button("Gerar JSON", type="primary", use_container_width=True)
-
-if generate_clicked:
-    if "Smart Parser" in mode:
+with col1:
+    if st.button("⚡ Gerar JSON (Smart Parser)", type="primary", use_container_width=True):
         parsed = smart_parse_workout(workout_text)
         st.session_state.llm_result = json.dumps(parsed, indent=2, ensure_ascii=False)
-        st.success("JSON gerado com sucesso via Smart Parser!")
-    else:
-        st.session_state.prompt_to_send = workout_text
+        st.success("JSON gerado instantaneamente via Smart Parser!")
 
-# WebLLM Component integration (only rendered when WebLLM mode is selected)
-if "WebLLM" in mode:
-    st.info("💡 **WebLLM AI Mode:** O modelo Llama-3.1-8B roda 100% no seu navegador via WebGPU.")
-    webllm_status = webllm_generate(prompt=st.session_state.get("prompt_to_send"), key="webllm_box")
+with col2:
+    show_webllm = st.checkbox("🤖 Exibir WebLLM AI (Local GPU)", value=False)
+
+if show_webllm:
+    st.info("💡 **WebLLM AI Mode:** Executa o modelo Llama-3.1 via WebGPU diretamente no seu navegador.")
     
-    if webllm_status:
-        if webllm_status.get("status") == "success":
-            st.session_state.llm_result = webllm_status.get("text")
-            st.session_state.prompt_to_send = None
-            st.success("WebLLM gerou a estrutura do treino!")
-        elif webllm_status.get("status") == "error":
-            st.warning(f"WebLLM não pôde ser carregado no iframe: {webllm_status.get('error')}. Recomendamos usar o modo **⚡ Smart Parser (Instantâneo)** acima.")
+    webllm_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; color: #1f2937; margin: 0; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; }
+        #status { font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #475569; display: flex; align-items: center; gap: 8px; }
+        .spinner { border: 2px solid #cbd5e1; border-top: 2px solid #2563eb; border-radius: 50%; width: 14px; height: 14px; animation: spin 0.8s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        button { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        textarea { width: 100%; height: 100px; font-family: monospace; font-size: 11px; margin-top: 8px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; box-sizing: border-box; background: #ffffff; }
+      </style>
+    </head>
+    <body>
+      <div id="status"><div class="spinner" id="spinner"></div><span id="text">Engine WebLLM Pronto</span></div>
+      <button id="genBtn" onclick="runWebLLM()">🤖 Processar com WebLLM AI</button>
+      <textarea id="output" placeholder="O JSON gerado pelo WebLLM aparecerá aqui..." readonly></textarea>
+
+      <script type="module">
+        import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+
+        let engine = null;
+
+        window.runWebLLM = async function() {
+          const btn = document.getElementById('genBtn');
+          const textEl = document.getElementById('text');
+          const spinnerEl = document.getElementById('spinner');
+          const out = document.getElementById('output');
+
+          btn.disabled = true;
+          spinnerEl.style.display = 'inline-block';
+
+          try {
+            if (!navigator.gpu) {
+              throw new Error("WebGPU não suportado neste navegador. Use Chrome ou Edge no Desktop.");
+            }
+
+            if (!engine) {
+              textEl.innerText = "Baixando modelo Llama-3.1 (WebLLM)...";
+              engine = await CreateMLCEngine("Llama-3.1-8B-Instruct-q4f32_1-MLC", {
+                initProgressCallback: (p) => { textEl.innerText = p.text; }
+              });
+            }
+
+            textEl.innerText = "Gerando estrutura JSON...";
+            
+            // Search for parent textarea content
+            let promptText = "Bench Press 4x8 60kg";
+            try {
+              const textareas = window.parent.document.querySelectorAll('textarea');
+              if (textareas && textareas.length > 0) {
+                promptText = textareas[0].value;
+              }
+            } catch(e) {}
+
+            const reply = await engine.chat.completions.create({
+              messages: [
+                { 
+                  role: "system", 
+                  content: "Convert workout to valid JSON format: {\\\"name\\\": \\\"Workout Title\\\", \\\"workouts\\\": [{\\\"title\\\": \\\"Day 1\\\", \\\"exercises\\\": [{\\\"name\\\": \\\"Bench Press (Barbell)\\\", \\\"sets\\\": [{\\\"type\\\": \\\"normal\\\", \\\"reps\\\": 8, \\\"weight_kg\\\": 60}]}]}]}. Return ONLY JSON." 
+                },
+                { role: "user", content: promptText }
+              ]
+            });
+
+            out.value = reply.choices[0].message.content;
+            textEl.innerText = "Concluído! Copie o JSON abaixo para a Etapa 2.";
+          } catch (err) {
+            textEl.innerText = "Erro: " + err.message;
+            out.value = "Erro WebLLM: " + err.message + "\\n\\nDica: Use o botão '⚡ Gerar JSON (Smart Parser)' acima que é 100% compatível!";
+          }
+
+          btn.disabled = false;
+          spinnerEl.style.display = 'none';
+        };
+      </script>
+    </body>
+    </html>
+    """
+    components.html(webllm_html, height=220)
 
 st.divider()
 
