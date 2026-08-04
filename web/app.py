@@ -180,13 +180,13 @@ if show_webllm:
     
     st.info(f"💡 **WebLLM AI Mode ({selected_model_id}):** Ao clicar no botão abaixo, o JSON será gerado pela GPU e preencherá a **Etapa 2** automaticamente!")
     
-    webllm_html = f"""
+    webllm_html = """
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
       <style>
-        :root {{
+        :root {
           --bg-color: #0e1117;
           --card-bg: #161b22;
           --border-color: #30363d;
@@ -195,9 +195,9 @@ if show_webllm:
           --primary-color: #ff4b4b;
           --primary-hover: #e03e3e;
           --code-bg: #0d1117;
-        }}
-        @media (prefers-color-scheme: light) {{
-          :root {{
+        }
+        @media (prefers-color-scheme: light) {
+          :root {
             --bg-color: #ffffff;
             --card-bg: #f8fafc;
             --border-color: #e2e8f0;
@@ -206,9 +206,9 @@ if show_webllm:
             --primary-color: #ff4b4b;
             --primary-hover: #e03e3e;
             --code-bg: #ffffff;
-          }}
-        }}
-        body {{
+          }
+        }
+        body {
           font-family: Source Sans Pro, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
           color: var(--text-color);
           margin: 0;
@@ -216,8 +216,8 @@ if show_webllm:
           background: var(--card-bg);
           border: 1px solid var(--border-color);
           border-radius: 8px;
-        }}
-        #status {{
+        }
+        #status {
           font-size: 13px;
           font-weight: 500;
           margin-bottom: 10px;
@@ -225,8 +225,8 @@ if show_webllm:
           display: flex;
           align-items: center;
           gap: 8px;
-        }}
-        .spinner {{
+        }
+        .spinner {
           border: 2px solid var(--border-color);
           border-top: 2px solid var(--primary-color);
           border-radius: 50%;
@@ -234,9 +234,9 @@ if show_webllm:
           height: 14px;
           animation: spin 0.8s linear infinite;
           display: none;
-        }}
-        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-        button {{
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        button {
           background-color: var(--primary-color);
           color: #ffffff;
           border: none;
@@ -246,10 +246,10 @@ if show_webllm:
           cursor: pointer;
           font-size: 13px;
           transition: background-color 0.2s;
-        }}
-        button:hover {{ background-color: var(--primary-hover); }}
-        button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
-        textarea {{
+        }
+        button:hover { background-color: var(--primary-hover); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        textarea {
           width: 100%;
           height: 90px;
           font-family: "Source Code Pro", monospace;
@@ -261,21 +261,21 @@ if show_webllm:
           box-sizing: border-box;
           background: var(--code-bg);
           color: var(--text-color);
-        }}
+        }
       </style>
     </head>
     <body>
-      <div id="status"><div class="spinner" id="spinner"></div><span id="text">Modelo selecionado: {selected_model_id}</span></div>
-      <button id="genBtn" onclick="runWebLLM()">🤖 Processar & Preencher Etapa 2 ({selected_model_id})</button>
+      <div id="status"><div class="spinner" id="spinner"></div><span id="text">Modelo selecionado: {SELECTED_MODEL_ID}</span></div>
+      <button id="genBtn" onclick="runWebLLM()">🤖 Processar & Preencher Etapa 2 ({SELECTED_MODEL_ID})</button>
       <textarea id="output" placeholder="O JSON gerado pelo WebLLM será enviado automaticamente para a Etapa 2..." readonly></textarea>
 
       <script type="module">
-        import {{ CreateMLCEngine, prebuiltAppConfig }} from "https://esm.run/@mlc-ai/web-llm";
+        import { CreateMLCEngine, prebuiltAppConfig } from "https://esm.run/@mlc-ai/web-llm";
 
         let engine = null;
-        let currentModel = "{selected_model_id}";
+        let currentModel = "{SELECTED_MODEL_ID}";
 
-        window.runWebLLM = async function() {{
+        window.runWebLLM = async function() {
           const btn = document.getElementById('genBtn');
           const textEl = document.getElementById('text');
           const spinnerEl = document.getElementById('spinner');
@@ -284,63 +284,63 @@ if show_webllm:
           btn.disabled = true;
           spinnerEl.style.display = 'inline-block';
 
-          try {{
-            if (!navigator.gpu) {{
+          try {
+            if (!navigator.gpu) {
               throw new Error("WebGPU não suportado neste navegador. Use Chrome ou Edge no Desktop.");
-            }}
+            }
 
-            if (!engine) {{
-              textEl.innerText = `Carregando modelo ${{currentModel}} do servidor local...`;
+            if (!engine) {
+              textEl.innerText = `Carregando modelo ${currentModel} do servidor local...`;
               
               const hostOrigin = window.parent.location.origin;
               const localModelUrl = hostOrigin + "/app/static/models/" + currentModel;
               
-              const customAppConfig = {{
+              const customAppConfig = {
                 model_list: [
-                  {{
+                  {
                     model: localModelUrl,
                     model_id: currentModel,
                     model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/" + currentModel.split("-MLC")[0] + "-ctx4k-webgpu.wasm",
-                  }},
+                  },
                   ...prebuiltAppConfig.model_list
                 ]
-              }};
+              };
 
-              try {{
-                engine = await CreateMLCEngine(currentModel, {{
+              try {
+                engine = await CreateMLCEngine(currentModel, {
                   appConfig: customAppConfig,
-                  initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
-                }});
-              }} catch(errLocal) {{
+                  initProgressCallback: (p) => { textEl.innerText = p.text; }
+                });
+              } catch(errLocal) {
                 console.warn("Local static route fetch failed, falling back to CDN:", errLocal);
                 textEl.innerText = `Carregando da CDN externa...`;
-                engine = await CreateMLCEngine(currentModel, {{
+                engine = await CreateMLCEngine(currentModel, {
                   appConfig: prebuiltAppConfig,
-                  initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
-                }});
-              }}
-            }}
+                  initProgressCallback: (p) => { textEl.innerText = p.text; }
+                });
+              }
+            }
 
             textEl.innerText = "Gerando estrutura JSON...";
             
             // Search for parent textarea content
             let promptText = "Bench Press 4x8 60kg";
-            try {{
+            try {
               const textareas = window.parent.document.querySelectorAll('textarea');
-              if (textareas && textareas.length > 0) {{
+              if (textareas && textareas.length > 0) {
                 promptText = textareas[0].value;
-              }}
-            }} catch(e) {{}}
+              }
+            } catch(e) {}
 
-            const reply = await engine.chat.completions.create({{
+            const reply = await engine.chat.completions.create({
               messages: [
-                {{ 
+                { 
                   role: "system", 
-                  content: "Do NOT write conversation text. Output ONLY valid JSON matching format: {{\\\"name\\\": \\\"Workout Title\\\", \\\"workouts\\\": [{{\\\"title\\\": \\\"Day 1\\\", \\\"exercises\\\": [{{\\\"name\\\": \\\"Bench Press (Barbell)\\\", \\\"sets\\\": [{{\\\"type\\\": \\\"normal\\\", \\\"reps\\\": 8, \\\"weight_kg\\\": 60}}]}}]}}]}}." 
-                }},
-                {{ role: "user", content: promptText }}
+                  content: 'Do NOT write conversation text. Output ONLY valid JSON matching format: {"name": "Workout Title", "workouts": [{"title": "Day 1", "exercises": [{"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "reps": 8, "weight_kg": 60}]}]}]}.'
+                },
+                { role: "user", content: promptText }
               ]
-            }});
+            });
 
             const rawText = reply.choices[0].message.content;
             const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -350,41 +350,42 @@ if show_webllm:
             textEl.innerText = "Concluído! Preenchendo Etapa 2 automaticamente...";
 
             // Auto-populate Step 2 textarea in parent Streamlit window
-            try {{
+            try {
               const parentTextareas = window.parent.document.querySelectorAll('textarea');
-              if (parentTextareas && parentTextareas.length > 1) {{
+              if (parentTextareas && parentTextareas.length > 1) {
                 const targetTextarea = parentTextareas[1];
                 
                 const valueSetter = Object.getOwnPropertyDescriptor(targetTextarea, 'value')?.set;
                 const prototype = Object.getPrototypeOf(targetTextarea);
                 const prototypeSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
                 
-                if (prototypeSetter && valueSetter !== prototypeSetter) {{
+                if (prototypeSetter && valueSetter !== prototypeSetter) {
                   prototypeSetter.call(targetTextarea, cleanJson);
-                }} else if (valueSetter) {{
+                } else if (valueSetter) {
                   valueSetter.call(targetTextarea, cleanJson);
-                }} else {{
+                } else {
                   targetTextarea.value = cleanJson;
-                }}
+                }
                 
-                targetTextarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                targetTextarea.dispatchEvent(new Event('change', {{ bubbles: true }}));
-              }}
-            }} catch(errSync) {{
+                targetTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                targetTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            } catch(errSync) {
               console.warn("Could not auto-populate parent textarea:", errSync);
-            }}
-          }} catch (err) {{
+            }
+          } catch (err) {
             textEl.innerText = "Erro: " + err.message;
-            out.value = "Erro WebLLM: " + err.message + "\\n\\nDica: Use o botão '⚡ Gerar JSON (Smart Parser)' acima que é 100% compatível!";
-          }}
+            out.value = "Erro WebLLM: " + err.message + "\n\nDica: Use o botão '⚡ Gerar JSON (Smart Parser)' acima que é 100% compatível!";
+          }
 
           btn.disabled = false;
           spinnerEl.style.display = 'none';
-        }};
+        };
       </script>
     </body>
     </html>
-    """
+    """.replace("{SELECTED_MODEL_ID}", selected_model_id)
+
     components.html(webllm_html, height=220)
 
 st.divider()
