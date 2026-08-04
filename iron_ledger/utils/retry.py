@@ -12,6 +12,7 @@ def with_retry(func: Callable) -> Callable:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         max_retries = RateLimits.MAX_RETRIES
+        assert max_retries >= 1, f"MAX_RETRIES must be >= 1, got {max_retries}"
         base_delay = RateLimits.BASE_DELAY
         
         for attempt in range(max_retries):
