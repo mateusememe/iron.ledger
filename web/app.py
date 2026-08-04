@@ -270,7 +270,6 @@ if show_webllm:
     <body>
       <div id="status"><div class="spinner" id="spinner"></div><span id="text">Modelo selecionado: {SELECTED_MODEL_ID}</span></div>
       <button id="genBtn" onclick="runWebLLM()">🤖 Processar & Preencher Etapa 2 ({SELECTED_MODEL_ID})</button>
-      <textarea id="output" placeholder="O JSON gerado pelo WebLLM será enviado automaticamente para a Etapa 2..." readonly></textarea>
 
       <script type="module">
         import { CreateMLCEngine, prebuiltAppConfig } from "https://esm.run/@mlc-ai/web-llm@0.2.78";
@@ -282,7 +281,6 @@ if show_webllm:
           const btn = document.getElementById('genBtn');
           const textEl = document.getElementById('text');
           const spinnerEl = document.getElementById('spinner');
-          const out = document.getElementById('output');
 
           btn.disabled = true;
           spinnerEl.style.display = 'inline-block';
@@ -336,15 +334,19 @@ if show_webllm:
 
             textEl.innerText = "Gerando estrutura JSON...";
             
-            // Search for parent textarea content by aria-label
+            // Search for parent textarea content by class
             let promptText = "";
+            let targetTextarea = null;
             try {
-              const workoutInput = window.parent.document.querySelector('textarea[aria-label="Treino em Linguagem Natural"]');
-              if (workoutInput && workoutInput.value) {
-                promptText = workoutInput.value;
+              const textareas = window.parent.document.querySelectorAll('.stTextArea textarea');
+              if (textareas && textareas.length > 0) {
+                promptText = textareas[0].value;
+              }
+              if (textareas && textareas.length > 1) {
+                targetTextarea = textareas[1];
               }
             } catch(e) {
-              console.warn("Could not access parent textarea:", e);
+              console.warn("Could not access parent textareas:", e);
             }
 
             if (!promptText) {
@@ -368,12 +370,10 @@ if show_webllm:
             const jsonMatch = rawText.match(/\{[\s\S]*\}/);
             const cleanJson = jsonMatch ? jsonMatch[0] : rawText;
 
-            out.value = cleanJson;
             textEl.innerText = "Concluído! Preenchendo Etapa 2 automaticamente...";
 
-            // Auto-populate Step 2 textarea in parent Streamlit window by aria-label
+            // Auto-populate Step 2 textarea in parent Streamlit window
             try {
-              const targetTextarea = window.parent.document.querySelector('textarea[aria-label="Confira e edite a estrutura JSON antes de enviar:"]');
               if (targetTextarea) {
                 
                 const valueSetter = Object.getOwnPropertyDescriptor(targetTextarea, 'value')?.set;
@@ -396,7 +396,6 @@ if show_webllm:
             }
           } catch (err) {
             textEl.innerText = "Erro: " + err.message;
-            out.value = "Erro WebLLM: " + err.message + "\n\nDica: Use o botão '⚡ Gerar JSON (Smart Parser)' acima que é 100% compatível!";
           }
 
           btn.disabled = false;
