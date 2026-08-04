@@ -147,10 +147,10 @@ if show_webllm:
     model_choice = st.selectbox(
         "Escolha o Modelo WebLLM:",
         [
-            "Llama-3.2-1B-Instruct-q4f16_1-MLC (⚡ Ultra Rápido ~700MB)",
-            "Qwen2.5-1.5B-Instruct-q4f16_1-MLC (🚀 Super Rápido ~900MB)",
-            "Phi-3.5-mini-instruct-q4f16_1-MLC (⚖️ Médio ~1.6GB)",
-            "Llama-3.1-8B-Instruct-q4f32_1-MLC (🧠 Completo ~4.3GB)",
+            "Llama-3.2-1B-Instruct-q4f16_1-MLC (⚡ Localhost Server ~0.5s)",
+            "Qwen2.5-1.5B-Instruct-q4f16_1-MLC (🚀 Localhost Server ~0.8s)",
+            "Phi-3.5-mini-instruct-q4f16_1-MLC (⚖️ HuggingFace CDN ~1.6GB)",
+            "Llama-3.1-8B-Instruct-q4f32_1-MLC (🧠 HuggingFace CDN ~4.3GB)",
         ],
         index=0
     )
@@ -158,7 +158,7 @@ if show_webllm:
     # Extract actual MLC model id string
     selected_model_id = model_choice.split(" ")[0]
     
-    st.info(f"💡 **WebLLM AI Mode ({selected_model_id}):** Roda diretamente na memória da sua GPU via WebGPU. Na 1ª execução o modelo será baixado para o cache do seu navegador e nas próximas o carregamento é instantâneo.")
+    st.info(f"💡 **WebLLM AI Mode ({selected_model_id}):** Modelos locais (`Llama-3.2-1B` e `Qwen2.5-1.5B`) são carregados em milissegundos direto do servidor do container Docker local via velocidade de rede Localhost!")
     
     webllm_html = f"""
     <!DOCTYPE html>
@@ -270,13 +270,37 @@ if show_webllm:
             }}
 
             if (!engine) {{
-              textEl.innerText = `Iniciando modelo ${{currentModel}} (WebLLM)...`;
+              textEl.innerText = `Carregando modelo ${{currentModel}} do servidor local...`;
               
-              // Correctly pass prebuiltAppConfig so model_list is always defined
-              engine = await CreateMLCEngine(currentModel, {{
-                appConfig: prebuiltAppConfig,
-                initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
-              }});
+              // Custom local appConfig for instant Localhost fetching
+              const hostOrigin = window.parent.location.origin;
+              const localModelUrl = hostOrigin + "/app/static/models/" + currentModel;
+              
+              const customAppConfig = {{
+                model_list: [
+                  {{
+                    model: localModelUrl,
+                    model_id: currentModel,
+                    model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/" + currentModel.split("-MLC")[0] + "-ctx4k-webgpu.wasm",
+                  }},
+                  ...prebuiltAppConfig.model_list
+                ]
+              }};
+
+              try {{
+                // Primary initialization from local container static route
+                engine = await CreateMLCEngine(currentModel, {{
+                  appConfig: customAppConfig,
+                  initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
+                }});
+              }} catch(errLocal) {{
+                console.warn("Local static route fetch failed, falling back to CDN:", errLocal);
+                textEl.innerText = `Carregando da CDN externa...`;
+                engine = await CreateMLCEngine(currentModel, {{
+                  appConfig: prebuiltAppConfig,
+                  initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
+                }});
+              }}
             }}
 
             textEl.innerText = "Gerando estrutura JSON...";

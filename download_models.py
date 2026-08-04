@@ -1,4 +1,5 @@
 import os
+import shutil
 import requests
 
 MODELS = [
@@ -40,12 +41,20 @@ def download_repo(repo_id, target_dir):
             print(f"  ✗ Failed to download {filename}: {r.status_code}")
 
 def main():
-    base_dir = os.path.abspath("models")
+    base_dir = os.path.abspath(os.path.join("static", "models"))
+    
+    # Migrate from old ./models if present
+    old_models = os.path.abspath("models")
+    if os.path.exists(old_models) and not os.path.exists(base_dir):
+        print(f"Moving models from {old_models} to {base_dir}...")
+        shutil.move(old_models, base_dir)
+
     for repo in MODELS:
         model_name = repo.split("/")[-1]
         model_dir = os.path.join(base_dir, model_name)
         download_repo(repo, model_dir)
-    print("All models ready locally in ./models/")
+        
+    print("All models ready locally in ./static/models/")
 
 if __name__ == "__main__":
     main()
