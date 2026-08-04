@@ -144,35 +144,118 @@ with col2:
     show_webllm = st.checkbox("🤖 Exibir WebLLM AI (Local GPU)", value=False)
 
 if show_webllm:
-    st.info("💡 **WebLLM AI Mode:** Executa o modelo Llama-3.1 via WebGPU diretamente no seu navegador.")
+    model_choice = st.selectbox(
+        "Escolha o Modelo WebLLM:",
+        [
+            "Llama-3.2-1B-Instruct-q4f16_1-MLC (⚡ Ultra Rápido ~700MB)",
+            "Qwen2.5-1.5B-Instruct-q4f16_1-MLC (🚀 Super Rápido ~900MB)",
+            "Phi-3.5-mini-instruct-q4f16_1-MLC (⚖️ Médio ~1.6GB)",
+            "Llama-3.1-8B-Instruct-q4f32_1-MLC (🧠 Completo ~4.3GB)",
+        ],
+        index=0
+    )
     
-    webllm_html = """
+    # Extract actual MLC model id string
+    selected_model_id = model_choice.split(" ")[0]
+    
+    st.info(f"💡 **WebLLM AI Mode ({selected_model_id}):** Roda diretamente na memória da sua GPU via WebGPU. Na 1ª execução o modelo será baixado para o cache do seu navegador e nas próximas o carregamento é instantâneo.")
+    
+    webllm_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: system-ui, -apple-system, sans-serif; color: #1f2937; margin: 0; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; }
-        #status { font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #475569; display: flex; align-items: center; gap: 8px; }
-        .spinner { border: 2px solid #cbd5e1; border-top: 2px solid #2563eb; border-radius: 50%; width: 14px; height: 14px; animation: spin 0.8s linear infinite; display: none; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        button { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
-        button:hover { background: #1d4ed8; }
-        button:disabled { background: #94a3b8; cursor: not-allowed; }
-        textarea { width: 100%; height: 100px; font-family: monospace; font-size: 11px; margin-top: 8px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; box-sizing: border-box; background: #ffffff; }
+        :root {{
+          --bg-color: #0e1117;
+          --card-bg: #161b22;
+          --border-color: #30363d;
+          --text-color: #e6edf3;
+          --muted-color: #8b949e;
+          --primary-color: #ff4b4b;
+          --primary-hover: #e03e3e;
+          --code-bg: #0d1117;
+        }}
+        @media (prefers-color-scheme: light) {{
+          :root {{
+            --bg-color: #ffffff;
+            --card-bg: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-color: #1e293b;
+            --muted-color: #64748b;
+            --primary-color: #ff4b4b;
+            --primary-hover: #e03e3e;
+            --code-bg: #ffffff;
+          }}
+        }}
+        body {{
+          font-family: Source Sans Pro, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+          color: var(--text-color);
+          margin: 0;
+          padding: 12px;
+          background: var(--card-bg);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+        }}
+        #status {{
+          font-size: 13px;
+          font-weight: 500;
+          margin-bottom: 10px;
+          color: var(--muted-color);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }}
+        .spinner {{
+          border: 2px solid var(--border-color);
+          border-top: 2px solid var(--primary-color);
+          border-radius: 50%;
+          width: 14px;
+          height: 14px;
+          animation: spin 0.8s linear infinite;
+          display: none;
+        }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        button {{
+          background-color: var(--primary-color);
+          color: #ffffff;
+          border: none;
+          padding: 9px 18px;
+          border-radius: 6px;
+          font-weight: 600;
+          cursor: pointer;
+          font-size: 13px;
+          transition: background-color 0.2s;
+        }}
+        button:hover {{ background-color: var(--primary-hover); }}
+        button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
+        textarea {{
+          width: 100%;
+          height: 110px;
+          font-family: "Source Code Pro", monospace;
+          font-size: 12px;
+          margin-top: 10px;
+          padding: 8px;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          box-sizing: border-box;
+          background: var(--code-bg);
+          color: var(--text-color);
+        }}
       </style>
     </head>
     <body>
-      <div id="status"><div class="spinner" id="spinner"></div><span id="text">Engine WebLLM Pronto</span></div>
-      <button id="genBtn" onclick="runWebLLM()">🤖 Processar com WebLLM AI</button>
+      <div id="status"><div class="spinner" id="spinner"></div><span id="text">Modelo selecionado: {selected_model_id}</span></div>
+      <button id="genBtn" onclick="runWebLLM()">🤖 Processar com WebLLM ({selected_model_id})</button>
       <textarea id="output" placeholder="O JSON gerado pelo WebLLM aparecerá aqui..." readonly></textarea>
 
       <script type="module">
-        import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+        import {{ CreateMLCEngine }} from "https://esm.run/@mlc-ai/web-llm";
 
         let engine = null;
+        let currentModel = "{selected_model_id}";
 
-        window.runWebLLM = async function() {
+        window.runWebLLM = async function() {{
           const btn = document.getElementById('genBtn');
           const textEl = document.getElementById('text');
           const spinnerEl = document.getElementById('spinner');
@@ -181,54 +264,54 @@ if show_webllm:
           btn.disabled = true;
           spinnerEl.style.display = 'inline-block';
 
-          try {
-            if (!navigator.gpu) {
+          try {{
+            if (!navigator.gpu) {{
               throw new Error("WebGPU não suportado neste navegador. Use Chrome ou Edge no Desktop.");
-            }
+            }}
 
-            if (!engine) {
-              textEl.innerText = "Baixando modelo Llama-3.1 (WebLLM)...";
-              engine = await CreateMLCEngine("Llama-3.1-8B-Instruct-q4f32_1-MLC", {
-                initProgressCallback: (p) => { textEl.innerText = p.text; }
-              });
-            }
+            if (!engine) {{
+              textEl.innerText = `Baixando modelo ${{currentModel}} (WebLLM)...`;
+              engine = await CreateMLCEngine(currentModel, {{
+                initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
+              }});
+            }}
 
             textEl.innerText = "Gerando estrutura JSON...";
             
             // Search for parent textarea content
             let promptText = "Bench Press 4x8 60kg";
-            try {
+            try {{
               const textareas = window.parent.document.querySelectorAll('textarea');
-              if (textareas && textareas.length > 0) {
+              if (textareas && textareas.length > 0) {{
                 promptText = textareas[0].value;
-              }
-            } catch(e) {}
+              }}
+            }} catch(e) {{}}
 
-            const reply = await engine.chat.completions.create({
+            const reply = await engine.chat.completions.create({{
               messages: [
-                { 
+                {{ 
                   role: "system", 
-                  content: "Convert workout to valid JSON format: {\\\"name\\\": \\\"Workout Title\\\", \\\"workouts\\\": [{\\\"title\\\": \\\"Day 1\\\", \\\"exercises\\\": [{\\\"name\\\": \\\"Bench Press (Barbell)\\\", \\\"sets\\\": [{\\\"type\\\": \\\"normal\\\", \\\"reps\\\": 8, \\\"weight_kg\\\": 60}]}]}]}. Return ONLY JSON." 
-                },
-                { role: "user", content: promptText }
+                  content: "Convert workout to valid JSON format: {{\\\"name\\\": \\\"Workout Title\\\", \\\"workouts\\\": [{{\\\"title\\\": \\\"Day 1\\\", \\\"exercises\\\": [{{\\\"name\\\": \\\"Bench Press (Barbell)\\\", \\\"sets\\\": [{{\\\"type\\\": \\\"normal\\\", \\\"reps\\\": 8, \\\"weight_kg\\\": 60}}]}}]}}]}}. Return ONLY JSON." 
+                }},
+                {{ role: "user", content: promptText }}
               ]
-            });
+            }});
 
             out.value = reply.choices[0].message.content;
             textEl.innerText = "Concluído! Copie o JSON abaixo para a Etapa 2.";
-          } catch (err) {
+          }} catch (err) {{
             textEl.innerText = "Erro: " + err.message;
             out.value = "Erro WebLLM: " + err.message + "\\n\\nDica: Use o botão '⚡ Gerar JSON (Smart Parser)' acima que é 100% compatível!";
-          }
+          }}
 
           btn.disabled = false;
           spinnerEl.style.display = 'none';
-        };
+        }};
       </script>
     </body>
     </html>
     """
-    components.html(webllm_html, height=220)
+    components.html(webllm_html, height=240)
 
 st.divider()
 
