@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import Iron Ledger core
-from iron_ledger.api.client import HevyClient
+from iron_ledger.config import Config
 from iron_ledger.importer.importer import ProgramImporter
 
 st.set_page_config(page_title="Iron Ledger Web", page_icon="🏋️", layout="centered")
@@ -411,8 +411,8 @@ try:
                 final_json = json.loads(edited_json_str)
                 
                 with st.spinner("Conectando à API do Hevy e importando rotinas..."):
-                    client = HevyClient(api_key=st.session_state.hevy_api_key)
-                    importer = ProgramImporter(client)
+                    config = Config(hevy_api_key=st.session_state.hevy_api_key)
+                    importer = ProgramImporter(config)
                     
                     folder_name = final_json.get("name", "Imported Workout Program")
                     importer.import_program(final_json, folder_name=folder_name)
