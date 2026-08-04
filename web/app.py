@@ -1,6 +1,11 @@
-import streamlit as st
+import sys
+import os
 import json
 import traceback
+import streamlit as st
+
+# Garante que a raiz do projeto esteja no path para importar iron_ledger
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import the custom WebLLM component
 from components.webllm import webllm_generate
