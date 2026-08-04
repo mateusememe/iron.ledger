@@ -360,10 +360,20 @@ if show_webllm:
               messages: [
                 { 
                   role: "system", 
-                  content: 'Do NOT write conversation text. Output ONLY valid JSON matching format: {"name": "Workout Title", "workouts": [{"title": "Day 1", "exercises": [{"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "reps": 8, "weight_kg": 60}]}]}]}.'
+                  content: `Você é um assistente de IA especialista em planilhas de treino. 
+Sua tarefa é extrair treinos de textos não-estruturados.
+Regras OBRIGATÓRIAS:
+1. Responda APENAS com um JSON válido, sem NENHUM texto adicional antes ou depois.
+2. Formato esperado exato: {"name": "Nome da Rotina", "workouts": [{"title": "Nome do Treino (ex: Upper)", "exercises": [{"name": "Supino", "sets": [{"type": "normal", "reps": 10, "weight_kg": 0}]}]}]}
+3. Se houver variação de repetições (ex: "8-12 repetições" ou "10 a 15"), extraia apenas o valor MAIOR (ex: 12 ou 15) como um NÚMERO (nunca como texto).
+4. Se o usuário não mencionar a carga/peso, defina weight_kg estritamente como o número 0.
+5. Se houver mais de um grupo muscular ou divisão citada (ex: Upper e Lower, ou Treino A e Treino B), crie múltiplos objetos distintos dentro da lista "workouts".
+6. Crie os objetos "sets" de acordo com a quantidade de séries pedidas (ex: "3 séries" -> array com 3 objetos).`
                 },
                 { role: "user", content: promptText }
-              ]
+              ],
+              temperature: 0.1,
+              max_tokens: 2500
             });
 
             const rawText = reply.choices[0].message.content;
