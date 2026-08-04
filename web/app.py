@@ -119,8 +119,22 @@ st.markdown("*Every set. Every rep. Accounted for.*")
 # Initialize Session State
 if "hevy_api_key" not in st.session_state:
     st.session_state.hevy_api_key = ""
-if "llm_result" not in st.session_state:
-    st.session_state.llm_result = None
+
+default_prompt = """ROTINA DE TREINAMENTO: PERIODIZAÇÃO AB (2 DIAS)
+
+TREINO A:
+1. Bench Press (Barbell) - 4 sets of 8 reps (60kg)
+2. Bent Over Row (Barbell) - 4 sets of 8 reps (50kg)
+3. Squat (Barbell) - 4 sets of 6 reps (80kg)
+
+TREINO B:
+1. Deadlift (Barbell) - 4 sets of 8 reps (100kg)
+2. Overhead Press (Barbell) - 4 sets of 8 reps (40kg)
+3. Lat Pulldown (Cable) - 3 sets of 15 reps (45kg)"""
+
+if "llm_result" not in st.session_state or st.session_state.llm_result is None:
+    initial_parsed = smart_parse_workout(default_prompt)
+    st.session_state.llm_result = json.dumps(initial_parsed, indent=2, ensure_ascii=False)
 
 # API Key Header
 api_key = st.text_input(
@@ -136,18 +150,6 @@ st.divider()
 
 st.subheader("1. Digite seu Treino")
 
-default_prompt = """ROTINA DE TREINAMENTO: PERIODIZAÇÃO AB (2 DIAS)
-
-TREINO A:
-1. Bench Press (Barbell) - 4 sets of 8 reps (60kg)
-2. Bent Over Row (Barbell) - 4 sets of 8 reps (50kg)
-3. Squat (Barbell) - 4 sets of 6 reps (80kg)
-
-TREINO B:
-1. Deadlift (Barbell) - 4 sets of 8 reps (100kg)
-2. Overhead Press (Barbell) - 4 sets of 8 reps (40kg)
-3. Lat Pulldown (Cable) - 3 sets of 15 reps (45kg)"""
-
 workout_text = st.text_area("Treino em Linguagem Natural", value=default_prompt, height=200)
 
 col1, col2 = st.columns([1, 1])
@@ -156,7 +158,7 @@ with col1:
     if st.button("⚡ Gerar JSON (Smart Parser)", type="primary", use_container_width=True):
         parsed = smart_parse_workout(workout_text)
         st.session_state.llm_result = json.dumps(parsed, indent=2, ensure_ascii=False)
-        st.success("JSON gerado instantaneamente via Smart Parser!")
+        st.success("JSON gerado instantaneamente na Etapa 2 abaixo!")
 
 with col2:
     show_webllm = st.checkbox("🤖 Exibir WebLLM AI (Local GPU)", value=False)
@@ -176,7 +178,7 @@ if show_webllm:
     # Extract actual MLC model id string
     selected_model_id = model_choice.split(" ")[0]
     
-    st.info(f"💡 **WebLLM AI Mode ({selected_model_id}):** Modelos locais (`Llama-3.2-1B` e `Qwen2.5-1.5B`) são carregados em milissegundos direto do servidor do container Docker local via velocidade de rede Localhost!")
+    st.info(f"💡 **WebLLM AI Mode ({selected_model_id}):** Ao clicar no botão abaixo, o JSON será gerado pela GPU e preencherá a **Etapa 2** automaticamente!")
     
     webllm_html = f"""
     <!DOCTYPE html>
@@ -249,9 +251,9 @@ if show_webllm:
         button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
         textarea {{
           width: 100%;
-          height: 110px;
+          height: 90px;
           font-family: "Source Code Pro", monospace;
-          font-size: 12px;
+          font-size: 11px;
           margin-top: 10px;
           padding: 8px;
           border-radius: 6px;
@@ -264,8 +266,8 @@ if show_webllm:
     </head>
     <body>
       <div id="status"><div class="spinner" id="spinner"></div><span id="text">Modelo selecionado: {selected_model_id}</span></div>
-      <button id="genBtn" onclick="runWebLLM()">🤖 Processar com WebLLM ({selected_model_id})</button>
-      <textarea id="output" placeholder="O JSON gerado pelo WebLLM aparecerá aqui..." readonly></textarea>
+      <button id="genBtn" onclick="runWebLLM()">🤖 Processar & Preencher Etapa 2 ({selected_model_id})</button>
+      <textarea id="output" placeholder="O JSON gerado pelo WebLLM será enviado automaticamente para a Etapa 2..." readonly></textarea>
 
       <script type="module">
         import {{ CreateMLCEngine, prebuiltAppConfig }} from "https://esm.run/@mlc-ai/web-llm";
@@ -290,7 +292,6 @@ if show_webllm:
             if (!engine) {{
               textEl.innerText = `Carregando modelo ${{currentModel}} do servidor local...`;
               
-              // Custom local appConfig for instant Localhost fetching
               const hostOrigin = window.parent.location.origin;
               const localModelUrl = hostOrigin + "/app/static/models/" + currentModel;
               
@@ -343,8 +344,35 @@ if show_webllm:
 
             const rawText = reply.choices[0].message.content;
             const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            out.value = jsonMatch ? jsonMatch[0] : rawText;
-            textEl.innerText = "Concluído! Copie o JSON abaixo para a Etapa 2.";
+            const cleanJson = jsonMatch ? jsonMatch[0] : rawText;
+
+            out.value = cleanJson;
+            textEl.innerText = "Concluído! Preenchendo Etapa 2 automaticamente...";
+
+            // Auto-populate Step 2 textarea in parent Streamlit window
+            try {{
+              const parentTextareas = window.parent.document.querySelectorAll('textarea');
+              if (parentTextareas && parentTextareas.length > 1) {{
+                const targetTextarea = parentTextareas[1];
+                
+                const valueSetter = Object.getOwnPropertyDescriptor(targetTextarea, 'value')?.set;
+                const prototype = Object.getPrototypeOf(targetTextarea);
+                const prototypeSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+                
+                if (prototypeSetter && valueSetter !== prototypeSetter) {{
+                  prototypeSetter.call(targetTextarea, cleanJson);
+                }} else if (valueSetter) {{
+                  valueSetter.call(targetTextarea, cleanJson);
+                }} else {{
+                  targetTextarea.value = cleanJson;
+                }}
+                
+                targetTextarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                targetTextarea.dispatchEvent(new Event('change', {{ bubbles: true }}));
+              }}
+            }} catch(errSync) {{
+              console.warn("Could not auto-populate parent textarea:", errSync);
+            }}
           }} catch (err) {{
             textEl.innerText = "Erro: " + err.message;
             out.value = "Erro WebLLM: " + err.message + "\\n\\nDica: Use o botão '⚡ Gerar JSON (Smart Parser)' acima que é 100% compatível!";
@@ -357,47 +385,44 @@ if show_webllm:
     </body>
     </html>
     """
-    components.html(webllm_html, height=240)
+    components.html(webllm_html, height=220)
 
 st.divider()
 
 st.subheader("2. Revisão & Envio para o Hevy")
 
-if st.session_state.llm_result:
-    cleaned_json_text = extract_json_from_llm_response(st.session_state.llm_result)
-    try:
-        parsed_json = json.loads(cleaned_json_text)
-        
-        # Display/Edit JSON
-        edited_json_str = st.text_area(
-            "Confira e edite a estrutura JSON antes de enviar:", 
-            value=json.dumps(parsed_json, indent=2, ensure_ascii=False), 
-            height=320
-        )
-        
-        if st.button("🚀 Enviar para o Hevy", type="primary", use_container_width=True):
-            if not st.session_state.hevy_api_key:
-                st.error("Por favor, insira sua Hevy API Key no campo superior antes de enviar.")
-            else:
-                try:
-                    final_json = json.loads(edited_json_str)
+cleaned_json_text = extract_json_from_llm_response(st.session_state.llm_result)
+try:
+    parsed_json = json.loads(cleaned_json_text)
+    
+    # Display/Edit JSON
+    edited_json_str = st.text_area(
+        "Confira e edite a estrutura JSON antes de enviar:", 
+        value=json.dumps(parsed_json, indent=2, ensure_ascii=False), 
+        height=320
+    )
+    
+    if st.button("🚀 Enviar para o Hevy", type="primary", use_container_width=True):
+        if not st.session_state.hevy_api_key:
+            st.error("Por favor, insira sua Hevy API Key no campo superior antes de enviar.")
+        else:
+            try:
+                final_json = json.loads(edited_json_str)
+                
+                with st.spinner("Conectando à API do Hevy e importando rotinas..."):
+                    client = HevyClient(api_key=st.session_state.hevy_api_key)
+                    importer = ProgramImporter(client)
                     
-                    with st.spinner("Conectando à API do Hevy e importando rotinas..."):
-                        client = HevyClient(api_key=st.session_state.hevy_api_key)
-                        importer = ProgramImporter(client)
-                        
-                        folder_name = final_json.get("name", "Imported Workout Program")
-                        importer.import_program(final_json, folder_name=folder_name)
-                        
-                    st.success(f"🎉 Programa '{folder_name}' importado com sucesso para o Hevy!")
-                    st.balloons()
+                    folder_name = final_json.get("name", "Imported Workout Program")
+                    importer.import_program(final_json, folder_name=folder_name)
                     
-                except Exception as e:
-                    st.error(f"Erro ao importar para o Hevy: {str(e)}")
-                    st.code(traceback.format_exc())
-                    
-    except json.JSONDecodeError:
-        st.error("JSON inválido gerado. Tente clicar em Gerar JSON novamente ou edite o texto acima.")
-        st.code(st.session_state.llm_result)
-else:
-    st.info("Aguardando geração do treino...")
+                st.success(f"🎉 Programa '{folder_name}' importado com sucesso para o Hevy!")
+                st.balloons()
+                
+            except Exception as e:
+                st.error(f"Erro ao importar para o Hevy: {str(e)}")
+                st.code(traceback.format_exc())
+                
+except json.JSONDecodeError:
+    st.error("JSON inválido gerado. Tente clicar em Gerar JSON novamente ou edite o texto acima.")
+    st.code(st.session_state.llm_result)
