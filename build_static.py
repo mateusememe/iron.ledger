@@ -17,13 +17,14 @@ def collect_files():
                 
     # 2. Collect Web app files
     files_dict["app.py"] = read_file("web/app.py")
-    files_dict["components/webllm.py"] = read_file("web/components/webllm.py")
-    files_dict["components/webllm_component/index.html"] = read_file("web/components/webllm_component/index.html")
     
     return files_dict
 
 def build_index_html():
     files = collect_files()
+    
+    # Escape </script> inside inlined Python source to prevent HTML breakage
+    files_json = json.dumps(files).replace("</", "<\\/")
     
     # Create the Stlite HTML template
     html_content = f"""<!DOCTYPE html>
@@ -40,10 +41,10 @@ def build_index_html():
 <body>
   <div id="root"></div>
   <script>
-    const files = {json.dumps(files)};
+    const files = {files_json};
     
     stlite.mount({{
-      requirements: ["requests", "python-dotenv", "pytest"],
+      requirements: ["requests", "python-dotenv"],
       entrypoint: "app.py",
       files: files,
     }}, document.getElementById("root"));

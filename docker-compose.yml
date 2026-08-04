@@ -1,16 +1,14 @@
 services:
   streamlit-dev:
-    image: python:3.10-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: iron-ledger-dev
     volumes:
       - .:/app
-    working_dir: /app
     ports:
       - "8585:8501"
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
-    command: >
-      bash -c "pip install -r requirements.txt streamlit && 
-               python download_models.py && 
-               streamlit run web/app.py --server.port=8501 --server.address=0.0.0.0"
+    command: streamlit run web/app.py --server.port=8501 --server.address=0.0.0.0

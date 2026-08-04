@@ -27,7 +27,9 @@ jobs:
           python-version: '3.10'
 
       - name: Build Static App
-        run: python build_static.py
+        run: |
+          pip install -r requirements.txt
+          python build_static.py
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

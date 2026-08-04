@@ -1,0 +1,14 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install deps at build time (cached layer)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt streamlit
+
+# Download models at build time (cached layer)
+COPY download_models.py .
+RUN python download_models.py
+
+# App source is bind-mounted at runtime via docker-compose volumes
+CMD ["streamlit", "run", "web/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

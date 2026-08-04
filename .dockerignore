@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.git/
+.github/
+.env
+.venv/
+dist/
+static/models/
+tests/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
