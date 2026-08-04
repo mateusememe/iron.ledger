@@ -33,6 +33,9 @@ def extract_json_from_llm_response(text: str) -> str:
         
     return clean
 
+# Default rest time in seconds between sets
+DEFAULT_REST_SECONDS = 90
+
 def smart_parse_workout(text: str) -> dict:
     """
     Built-in smart parser that extracts workouts, exercises, sets, reps, and weights.
@@ -89,7 +92,7 @@ def smart_parse_workout(text: str) -> dict:
             
         # Extract Exercise Name
         ex_name = None
-        ex_match = re.search(r'^(?:\d+[\.\)]\s*)?([A-Za-zÀ-ÿ\s\(\)\-\/\:\,\'\"]+?)(?:[\:\-]\s*|\s+\d+\s*(?:x|sets|séries|\*))', line_str, re.IGNORECASE)
+        ex_match = re.search(r'^(?:\d+[\.\)]\s*)?([A-Za-zÀ-ÿ\s\(\)\-\/\:\,]+?)(?:[\:\-]\s*|\s+\d+\s*(?:x|sets|séries|\*))', line_str, re.IGNORECASE)
         if ex_match:
             candidate = ex_match.group(1).strip(" :-")
             if len(candidate) > 2 and not candidate.upper().startswith("FOCO") and not candidate.upper().startswith("OBSERVAÇÃO"):
@@ -98,7 +101,7 @@ def smart_parse_workout(text: str) -> dict:
         if ex_name:
             exercise_obj = {
                 "name": ex_name,
-                "rest_seconds": 90,
+                "rest_seconds": DEFAULT_REST_SECONDS,
                 "notes": "",
                 "sets": [{"type": "normal", "reps": reps_count, "weight_kg": weight_kg} for _ in range(sets_count)]
             }
@@ -270,7 +273,7 @@ if show_webllm:
       <textarea id="output" placeholder="O JSON gerado pelo WebLLM será enviado automaticamente para a Etapa 2..." readonly></textarea>
 
       <script type="module">
-        import { CreateMLCEngine, prebuiltAppConfig } from "https://esm.run/@mlc-ai/web-llm";
+        import { CreateMLCEngine, prebuiltAppConfig } from "https://esm.run/@mlc-ai/web-llm@0.2.78";
 
         let engine = null;
         let currentModel = "{SELECTED_MODEL_ID}";
@@ -295,12 +298,22 @@ if show_webllm:
               const hostOrigin = window.parent.location.origin;
               const localModelUrl = hostOrigin + "/app/static/models/" + currentModel;
               
+              const MODEL_LIB_MAP = {
+                "Llama-3.2-1B-Instruct-q4f16_1-MLC": "Llama-3.2-1B-Instruct-q4f16_1-ctx4k-webgpu.wasm",
+                "Qwen2.5-1.5B-Instruct-q4f16_1-MLC": "Qwen2.5-1.5B-Instruct-q4f16_1-ctx4k-webgpu.wasm",
+                "Phi-3.5-mini-instruct-q4f16_1-MLC": "Phi-3.5-mini-instruct-q4f16_1-ctx4k-webgpu.wasm",
+                "Llama-3.1-8B-Instruct-q4f32_1-MLC": "Llama-3.1-8B-Instruct-q4f32_1-ctx4k-webgpu.wasm",
+              };
+              const libFile = MODEL_LIB_MAP[currentModel];
+
               const customAppConfig = {
                 model_list: [
                   {
                     model: localModelUrl,
                     model_id: currentModel,
-                    model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/" + currentModel.split("-MLC")[0] + "-ctx4k-webgpu.wasm",
+                    model_lib: libFile
+                      ? "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/" + libFile
+                      : undefined,
                   },
                   ...prebuiltAppConfig.model_list
                 ]
@@ -323,14 +336,23 @@ if show_webllm:
 
             textEl.innerText = "Gerando estrutura JSON...";
             
-            // Search for parent textarea content
-            let promptText = "Bench Press 4x8 60kg";
+            // Search for parent textarea content by aria-label
+            let promptText = "";
             try {
-              const textareas = window.parent.document.querySelectorAll('textarea');
-              if (textareas && textareas.length > 0) {
-                promptText = textareas[0].value;
+              const workoutInput = window.parent.document.querySelector('textarea[aria-label="Treino em Linguagem Natural"]');
+              if (workoutInput && workoutInput.value) {
+                promptText = workoutInput.value;
               }
-            } catch(e) {}
+            } catch(e) {
+              console.warn("Could not access parent textarea:", e);
+            }
+
+            if (!promptText) {
+              textEl.innerText = "Erro: Nenhum texto de treino encontrado. Digite seu treino na Etapa 1.";
+              btn.disabled = false;
+              spinnerEl.style.display = 'none';
+              return;
+            }
 
             const reply = await engine.chat.completions.create({
               messages: [
@@ -349,11 +371,10 @@ if show_webllm:
             out.value = cleanJson;
             textEl.innerText = "Concluído! Preenchendo Etapa 2 automaticamente...";
 
-            // Auto-populate Step 2 textarea in parent Streamlit window
+            // Auto-populate Step 2 textarea in parent Streamlit window by aria-label
             try {
-              const parentTextareas = window.parent.document.querySelectorAll('textarea');
-              if (parentTextareas && parentTextareas.length > 1) {
-                const targetTextarea = parentTextareas[1];
+              const targetTextarea = window.parent.document.querySelector('textarea[aria-label="Confira e edite a estrutura JSON antes de enviar:"]');
+              if (targetTextarea) {
                 
                 const valueSetter = Object.getOwnPropertyDescriptor(targetTextarea, 'value')?.set;
                 const prototype = Object.getPrototypeOf(targetTextarea);
