@@ -250,7 +250,7 @@ if show_webllm:
       <textarea id="output" placeholder="O JSON gerado pelo WebLLM aparecerá aqui..." readonly></textarea>
 
       <script type="module">
-        import {{ CreateMLCEngine }} from "https://esm.run/@mlc-ai/web-llm";
+        import {{ CreateMLCEngine, prebuiltAppConfig }} from "https://esm.run/@mlc-ai/web-llm";
 
         let engine = null;
         let currentModel = "{selected_model_id}";
@@ -271,21 +271,12 @@ if show_webllm:
 
             if (!engine) {{
               textEl.innerText = `Iniciando modelo ${{currentModel}} (WebLLM)...`;
-              try {{
-                // Primary initialization with IndexedDB cache
-                engine = await CreateMLCEngine(currentModel, {{
-                  appConfig: {{ useIndexedDBCache: true }},
-                  initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
-                }});
-              }} catch (cacheErr) {{
-                console.warn("CacheStorage error encountered, falling back to direct stream in memory:", cacheErr);
-                textEl.innerText = "Reconfigurando streaming direto em memória...";
-                // Fallback initialization without CacheStorage API to prevent Cache.add() network errors
-                engine = await CreateMLCEngine(currentModel, {{
-                  appConfig: {{ useIndexedDBCache: false }},
-                  initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
-                }});
-              }}
+              
+              // Correctly pass prebuiltAppConfig so model_list is always defined
+              engine = await CreateMLCEngine(currentModel, {{
+                appConfig: prebuiltAppConfig,
+                initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
+              }});
             }}
 
             textEl.innerText = "Gerando estrutura JSON...";
