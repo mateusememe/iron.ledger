@@ -15,6 +15,24 @@ from iron_ledger.importer.importer import ProgramImporter
 
 st.set_page_config(page_title="Iron Ledger Web", page_icon="🏋️", layout="centered")
 
+def extract_json_from_llm_response(text: str) -> str:
+    """
+    Extracts valid JSON object from LLM response text,
+    stripping markdown codeblocks (```json ... ```) and conversational text.
+    """
+    if not text:
+        return ""
+        
+    # Strip markdown codeblock backticks
+    clean = re.sub(r'```(?:json)?', '', text).strip('` \t\r\n')
+    
+    # Extract first '{' to last '}'
+    match = re.search(r'(\{[\s\S]*\})', clean)
+    if match:
+        return match.group(1).strip()
+        
+    return clean
+
 def smart_parse_workout(text: str) -> dict:
     """
     Built-in smart parser that extracts workouts, exercises, sets, reps, and weights.
@@ -288,7 +306,6 @@ if show_webllm:
               }};
 
               try {{
-                // Primary initialization from local container static route
                 engine = await CreateMLCEngine(currentModel, {{
                   appConfig: customAppConfig,
                   initProgressCallback: (p) => {{ textEl.innerText = p.text; }}
@@ -318,13 +335,15 @@ if show_webllm:
               messages: [
                 {{ 
                   role: "system", 
-                  content: "Convert workout to valid JSON format: {{\\\"name\\\": \\\"Workout Title\\\", \\\"workouts\\\": [{{\\\"title\\\": \\\"Day 1\\\", \\\"exercises\\\": [{{\\\"name\\\": \\\"Bench Press (Barbell)\\\", \\\"sets\\\": [{{\\\"type\\\": \\\"normal\\\", \\\"reps\\\": 8, \\\"weight_kg\\\": 60}}]}}]}}]}}. Return ONLY JSON." 
+                  content: "Do NOT write conversation text. Output ONLY valid JSON matching format: {{\\\"name\\\": \\\"Workout Title\\\", \\\"workouts\\\": [{{\\\"title\\\": \\\"Day 1\\\", \\\"exercises\\\": [{{\\\"name\\\": \\\"Bench Press (Barbell)\\\", \\\"sets\\\": [{{\\\"type\\\": \\\"normal\\\", \\\"reps\\\": 8, \\\"weight_kg\\\": 60}}]}}]}}]}}." 
                 }},
                 {{ role: "user", content: promptText }}
               ]
             }});
 
-            out.value = reply.choices[0].message.content;
+            const rawText = reply.choices[0].message.content;
+            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+            out.value = jsonMatch ? jsonMatch[0] : rawText;
             textEl.innerText = "Concluído! Copie o JSON abaixo para a Etapa 2.";
           }} catch (err) {{
             textEl.innerText = "Erro: " + err.message;
@@ -345,8 +364,9 @@ st.divider()
 st.subheader("2. Revisão & Envio para o Hevy")
 
 if st.session_state.llm_result:
+    cleaned_json_text = extract_json_from_llm_response(st.session_state.llm_result)
     try:
-        parsed_json = json.loads(st.session_state.llm_result)
+        parsed_json = json.loads(cleaned_json_text)
         
         # Display/Edit JSON
         edited_json_str = st.text_area(
