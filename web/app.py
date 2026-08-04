@@ -373,7 +373,7 @@ Regras OBRIGATÓRIAS:
                 { role: "user", content: promptText }
               ],
               temperature: 0.1,
-              max_tokens: 2500
+              max_tokens: 8192
             });
 
             const rawText = reply.choices[0].message.content;
