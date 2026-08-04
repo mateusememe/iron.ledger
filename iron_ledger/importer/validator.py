@@ -1,8 +1,6 @@
 from typing import Any, Dict, List
 
-class ValidationError(Exception):
-    """Raised when a workout program fails validation."""
-    pass
+from iron_ledger.exceptions import ValidationError
 
 VALID_SET_TYPES = {"warmup", "normal", "failure", "dropset"}
 VALID_RPES = {6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10}
